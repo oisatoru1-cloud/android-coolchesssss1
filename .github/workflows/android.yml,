@@ -1,0 +1,70 @@
+name: Build COOLCHESS APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'COOLCHESS-Android-Project.zip'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract COOLCHESS project
+        run: |
+          unzip -q COOLCHESS-Android-Project.zip -d project
+          test -f project/package.json
+          test -f project/capacitor.config.json
+          test -f project/www/index.html
+
+      - name: Install dependencies
+        working-directory: project
+        run: npm install
+
+      - name: Generate Android project
+        working-directory: project
+        run: npx cap add android
+
+      - name: Sync Android project
+        working-directory: project
+        run: npx cap sync android
+
+      - name: Build APK
+        working-directory: project
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: COOLCHESS-APK
+          path: project/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
